@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "205718912692",
+    "project_id": "pasaedan-d682e",
+    "storage_bucket": "pasaedan-d682e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:205718912692:android:6c74af1ad86acea62721e1",
+        "android_client_info": {
+          "package_name": "kr.co.pasaedan"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCM5JWkJA3DLfd2gywh0qPNAoCEfSSaoFg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
