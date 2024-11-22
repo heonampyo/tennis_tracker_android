@@ -15,7 +15,9 @@ import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.WebChromeClient
 import android.webkit.WebView
+import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -29,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -92,10 +95,10 @@ class MainActivity : ComponentActivity() {
                     SmallFloatingActionButton(
                         onClick = { showNameInputDialog(isInitial = false) },
                         modifier = Modifier
-                            .padding(16.dp)
+                            .padding(start = 10.dp, bottom = 80.dp)
                             .align(Alignment.BottomStart)
                     ) {
-                        Icon(Icons.Filled.Edit, "이름 수정")
+                        Icon(Icons.Filled.Notifications, "이름 수정")
                     }
                 }
             }
@@ -112,18 +115,19 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showNameInputDialog(isInitial: Boolean) {
+        // 수직 레이아웃 생성
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 16, 32, 16)
+        }
+
+        // 이름 입력 EditText
         val input = EditText(this).apply {
-            // 한글 입력 최적화를 위한 설정
             inputType = InputType.TYPE_CLASS_TEXT
             privateImeOptions = "nm"
-
-            // IME 옵션 설정
             imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI
-
-            // 초기 텍스트 설정
             setText(PreferenceManager.getUserName(this@MainActivity) ?: "")
 
-            // 공백 제거는 입력 완료 후 처리
             doAfterTextChanged { editable ->
                 val currentText = editable?.toString() ?: ""
                 val filteredText = currentText.replace("\\s".toRegex(), "")
@@ -140,14 +144,26 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // 전체 푸시 수신 체크박스
+        val checkbox = CheckBox(this).apply {
+            text = "전체 푸시 수신"
+            isChecked = PreferenceManager.getReceiveAllPush(this@MainActivity) // 저장된 설정 불러오기
+            setPadding(0, 16, 0, 0)
+        }
+
+        // 컨테이너에 뷰들 추가
+        container.addView(input)
+        container.addView(checkbox)
+
         val dialog = AlertDialog.Builder(this)
             .setTitle("이름 입력")
             .setMessage("푸시에 사용되는 이름을 입력해주세요.")
-            .setView(input)
+            .setView(container)
             .setPositiveButton("확인") { _, _ ->
                 val name = input.text.toString().trim()
                 if (name.isNotEmpty()) {
                     PreferenceManager.setUserName(this, name)
+                    PreferenceManager.setReceiveAllPush(this, checkbox.isChecked)
                     PreferenceManager.getFcmToken(this)?.let {
                         sendRegistrationTokenToServer(it)
                     }
@@ -157,16 +173,14 @@ class MainActivity : ComponentActivity() {
             }
             .create()
 
-        // 최초 실행시에는 취소 불가능
         if (!isInitial) {
             dialog.setButton(DialogInterface.BUTTON_NEGATIVE, "취소") { _, _ -> }
         }
 
-        // 백버튼 처리
         dialog.setCancelable(!isInitial)
-
         dialog.show()
     }
+
 
     private fun observeViewModel() {
         lifecycleScope.launch {
@@ -236,7 +250,7 @@ class MainActivity : ComponentActivity() {
 
     private fun sendRegistrationTokenToServer(token: String) {
         PreferenceManager.getUserName(this)?.let {
-            fcmViewModel.updateFcmToken(userId = it, fcmToken = token)
+            fcmViewModel.updateFcmToken(userId = it, fcmToken = token, isAllPush = PreferenceManager.getReceiveAllPush(this))
         }
     }
 }

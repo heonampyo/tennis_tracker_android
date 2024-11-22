@@ -56,6 +56,7 @@ class FCMService : FirebaseMessagingService() {
         )
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.pasaedan)
             .setContentTitle(remoteMessage.notification?.title ?: "알림")
             .setContentText(remoteMessage.notification?.body)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

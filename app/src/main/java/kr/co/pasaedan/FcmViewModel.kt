@@ -13,11 +13,11 @@ class FcmViewModel : ViewModel() {
     private val _updateState = MutableStateFlow<Result<FcmTokenResponse>?>(null)
     val updateState = _updateState.asStateFlow()
     
-    fun updateFcmToken(userId: String, fcmToken: String) {
+    fun updateFcmToken(userId: String, fcmToken: String, isAllPush: Boolean) {
         viewModelScope.launch {
             _updateState.value = null // 로딩 상태 초기화
             
-            repository.updateFcmToken(userId, fcmToken)
+            repository.updateFcmToken(userId, fcmToken, isAllPush)
                 .onSuccess { response ->
                     _updateState.value = Result.success(response)
                 }

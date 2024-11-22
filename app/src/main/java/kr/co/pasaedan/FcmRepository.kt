@@ -4,10 +4,10 @@ import com.google.gson.Gson
 
 // FcmRepository.kt
 class FcmRepository {
-    suspend fun updateFcmToken(userId: String, fcmToken: String): Result<FcmTokenResponse> {
+    suspend fun updateFcmToken(userId: String, fcmToken: String, isAllPush: Boolean): Result<FcmTokenResponse> {
         return try {
             val response = NetworkModule.apiService.updateFcmToken(
-                FcmTokenRequest(userId, fcmToken)
+                FcmTokenRequest(userId, fcmToken, isAllPush)
             )
             
             when {

@@ -7,7 +7,8 @@ import retrofit2.http.POST
 // FcmTokenModels.kt
 data class FcmTokenRequest(
     val userId: String,
-    val fcmToken: String
+    val fcmToken: String,
+    val isAllPush: Boolean
 )
 
 data class FcmTokenResponse(
