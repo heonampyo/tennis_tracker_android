@@ -34,7 +34,7 @@ object PreferenceManager {
 
     fun getReceiveAllPush(context: Context): Boolean {
         return context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_FCM_All, false)
+            .getBoolean(KEY_FCM_All, true)
     }
 
     fun setReceiveAllPush(context: Context, isChecked: Boolean) {
