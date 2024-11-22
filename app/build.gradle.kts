@@ -69,6 +69,10 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.messaging.ktx)
 
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp.logging)  // 네트워크 로깅을 위한 의존성
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

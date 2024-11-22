@@ -2,28 +2,38 @@ package kr.co.pasaedan
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.DialogInterface
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.text.InputFilter
+import android.text.InputType
 import android.util.Log
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -37,13 +47,20 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.widget.doAfterTextChanged
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kr.co.pasaedan.ui.theme.PasaedanProjectTheme
 
 class MainActivity : ComponentActivity() {
+    private val fcmViewModel: FcmViewModel by viewModels()
 
     val permissionString = "android.permission.POST_NOTIFICATIONS"
     private val requestPermissionLauncher = registerForActivityResult(
@@ -58,12 +75,107 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         checkNotificationPermission()
         enableEdgeToEdge()
+        observeViewModel()
+
         setContent {
             PasaedanProjectTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // 기존 컨텐츠
+                    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                        Greeting(
+                            name = "Android",
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
+
+                    // FAB 추가
+                    SmallFloatingActionButton(
+                        onClick = { showNameInputDialog(isInitial = false) },
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .align(Alignment.BottomStart)
+                    ) {
+                        Icon(Icons.Filled.Edit, "이름 수정")
+                    }
+                }
+            }
+        }
+
+        // 최초 실행 시 이름 확인
+        checkUserName()
+    }
+    private fun checkUserName() {
+        val userName = PreferenceManager.getUserName(this)
+        if (userName.isNullOrEmpty()) {
+            showNameInputDialog(isInitial = true)
+        }
+    }
+
+    private fun showNameInputDialog(isInitial: Boolean) {
+        val input = EditText(this).apply {
+            // 한글 입력 최적화를 위한 설정
+            inputType = InputType.TYPE_CLASS_TEXT
+            privateImeOptions = "nm"
+
+            // IME 옵션 설정
+            imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI
+
+            // 초기 텍스트 설정
+            setText(PreferenceManager.getUserName(this@MainActivity) ?: "")
+
+            // 공백 제거는 입력 완료 후 처리
+            doAfterTextChanged { editable ->
+                val currentText = editable?.toString() ?: ""
+                val filteredText = currentText.replace("\\s".toRegex(), "")
+
+                if (currentText != filteredText) {
+                    val selection = selectionStart
+                    setText(filteredText)
+                    if (selection <= filteredText.length) {
+                        setSelection(selection)
+                    } else {
+                        setSelection(filteredText.length)
+                    }
+                }
+            }
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("이름 입력")
+            .setMessage("푸시에 사용되는 이름을 입력해주세요.")
+            .setView(input)
+            .setPositiveButton("확인") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotEmpty()) {
+                    PreferenceManager.setUserName(this, name)
+                    PreferenceManager.getFcmToken(this)?.let {
+                        sendRegistrationTokenToServer(it)
+                    }
+                } else {
+                    showNameInputDialog(isInitial)
+                }
+            }
+            .create()
+
+        // 최초 실행시에는 취소 불가능
+        if (!isInitial) {
+            dialog.setButton(DialogInterface.BUTTON_NEGATIVE, "취소") { _, _ -> }
+        }
+
+        // 백버튼 처리
+        dialog.setCancelable(!isInitial)
+
+        dialog.show()
+    }
+
+    private fun observeViewModel() {
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED){
+                fcmViewModel.updateState.collect { result ->
+                    result?.fold(
+                        onSuccess = {}, onFailure = { exception ->
+                            Toast.makeText(this@MainActivity, "${exception.message}", Toast.LENGTH_LONG).show()
+                        }
                     )
                 }
             }
@@ -100,6 +212,12 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val token = task.result
+                if(token == PreferenceManager.getFcmToken(this@MainActivity)){
+                    Log.d("FCM", "토큰 같아서 통신 안보냄.")
+                    return@addOnCompleteListener
+                }
+
+                PreferenceManager.setFcmToken(this@MainActivity, token)
                 Log.d("FCM", "토큰: $token")
                 sendRegistrationTokenToServer(token)
             }
@@ -117,7 +235,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun sendRegistrationTokenToServer(token: String) {
-        Toast.makeText(this, "token : $token", Toast.LENGTH_LONG).show()
+        PreferenceManager.getUserName(this)?.let {
+            fcmViewModel.updateFcmToken(userId = it, fcmToken = token)
+        }
     }
 }
 
